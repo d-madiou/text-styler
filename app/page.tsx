@@ -45,6 +45,9 @@ export default function Home() {
   const [text, setText] = useState("");
   const [selectedStyle, setSelectedStyle] = useState("boldSans");
   const [copied, setCopied] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageStatus, setImageStatus] = useState<"idle" | "preview" | "loading" | "success" | "error">("idle");
+  const [imageError, setImageError] = useState("");
 
   const output = useMemo(() => {
     return convertText(text, selectedStyle);
@@ -64,6 +67,38 @@ export default function Home() {
   const handleReset = () => {
     setText("");
     setCopied(false);
+  };
+
+  const handleImageUrlChange = (value: string) => {
+    setImageUrl(value);
+    setImageError("");
+    setImageStatus(value.trim() ? "preview" : "idle");
+  };
+
+  const handleImageDownload = async () => {
+    try {
+      const parsed = new URL(imageUrl);
+      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only HTTP and HTTPS image URLs are supported.");
+      setImageStatus("loading");
+      const response = await fetch("/api/image-download?url=" + encodeURIComponent(imageUrl));
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || "The image could not be downloaded.");
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = "download";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      setImageStatus("success");
+    } catch (error) {
+      setImageStatus("error");
+      setImageError(error instanceof Error ? error.message : "The image could not be downloaded.");
+    }
   };
 
   return (
@@ -153,6 +188,60 @@ export default function Home() {
             >
               Reset All
             </button>
+          </div>
+
+          <div className="mt-10 border-t border-red-100 pt-8">
+            <label htmlFor="image-url" className="mb-3 block text-sm font-bold text-black">
+              Download an image
+            </label>
+            <p id="image-url-help" className="mb-3 text-sm text-zinc-600">
+              Paste a direct public image URL. Social post links are not supported.
+            </p>
+            <input
+              id="image-url"
+              type="url"
+              value={imageUrl}
+              onChange={(event) => handleImageUrlChange(event.target.value)}
+              placeholder="https://example.com/image.jpg"
+              aria-describedby="image-url-help image-status"
+              className="w-full rounded-2xl border-2 border-red-100 bg-white p-4 text-base text-black placeholder:text-zinc-400 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+            />
+
+            {imageUrl.trim() && (
+              <div className="mt-4 overflow-hidden rounded-2xl border-2 border-red-100 bg-red-50/50 p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary remote URLs cannot use next/image without an allowlist */}
+                <img
+                  src={imageUrl}
+                  alt="Preview of the image to download"
+                  className="max-h-72 w-full rounded-xl object-contain"
+                  onError={() => setImageStatus("error")}
+                />
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-col gap-3 md:flex-row">
+              <button
+                type="button"
+                onClick={handleImageDownload}
+                disabled={!imageUrl.trim() || imageStatus === "loading"}
+                className="flex-1 rounded-2xl bg-red-600 px-6 py-4 text-lg font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+              >
+                {imageStatus === "loading" ? "Downloading..." : "Download Image"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setImageUrl(""); setImageError(""); setImageStatus("idle"); }}
+                className="rounded-2xl border-2 border-red-200 px-6 py-4 font-bold text-red-600 transition hover:bg-red-50"
+              >
+                Clear URL
+              </button>
+            </div>
+
+            <p id="image-status" role="status" aria-live="polite" className="mt-3 text-sm text-zinc-600">
+              {imageStatus === "success" && "Download started. On iPhone, Safari may offer the file through Files or the share sheet instead of Photos."}
+              {imageStatus === "error" && (imageError || "The preview could not be loaded. The download may still work if the URL is a valid image.")}
+              {imageStatus !== "success" && imageStatus !== "error" && "Images are fetched securely by the server and are not stored."}
+            </p>
           </div>
         </div>
       </div>
