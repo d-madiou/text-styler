@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { parseSocialUrl } from "@/lib/social-url";
 
 const styles = [
   { id: "boldSans", label: "Bold Sans" },
@@ -75,8 +76,12 @@ export default function Home() {
     setImageStatus(value.trim() ? "preview" : "idle");
   };
 
+  const social = imageUrl.trim() ? parseSocialUrl(imageUrl.trim()) : null;
+  const isVideo = /\.mp4(?:[?#]|$)/i.test(imageUrl);
+
   const handleImageDownload = async () => {
     try {
+      if (social) throw new Error("This social post requires official platform API access and cannot be downloaded here.");
       const parsed = new URL(imageUrl);
       if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only HTTP and HTTPS image URLs are supported.");
       setImageStatus("loading");
@@ -192,10 +197,10 @@ export default function Home() {
 
           <div className="mt-10 border-t border-red-100 pt-8">
             <label htmlFor="image-url" className="mb-3 block text-sm font-bold text-black">
-              Download an image
+              Download media
             </label>
             <p id="image-url-help" className="mb-3 text-sm text-zinc-600">
-              Paste a direct public image URL. Social post links are not supported.
+              Paste a direct public image or MP4 URL. Social posts require official API access.
             </p>
             <input
               id="image-url"
@@ -209,13 +214,12 @@ export default function Home() {
 
             {imageUrl.trim() && (
               <div className="mt-4 overflow-hidden rounded-2xl border-2 border-red-100 bg-red-50/50 p-3">
-                {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary remote URLs cannot use next/image without an allowlist */}
-                <img
-                  src={imageUrl}
-                  alt="Preview of the image to download"
-                  className="max-h-72 w-full rounded-xl object-contain"
-                  onError={() => setImageStatus("error")}
-                />
+                {isVideo ? (
+                  <video src={imageUrl} controls className="max-h-72 w-full rounded-xl" onError={() => setImageStatus("error")} />
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element -- arbitrary remote URLs cannot use next/image without an allowlist */
+                  <img src={imageUrl} alt="Preview of the image to download" className="max-h-72 w-full rounded-xl object-contain" onError={() => setImageStatus("error")} />
+                )}
               </div>
             )}
 
@@ -238,9 +242,10 @@ export default function Home() {
             </div>
 
             <p id="image-status" role="status" aria-live="polite" className="mt-3 text-sm text-zinc-600">
-              {imageStatus === "success" && "Download started. On iPhone, Safari may offer the file through Files or the share sheet instead of Photos."}
-              {imageStatus === "error" && (imageError || "The preview could not be loaded. The download may still work if the URL is a valid image.")}
-              {imageStatus !== "success" && imageStatus !== "error" && "Images are fetched securely by the server and are not stored."}
+              {social && social.platform + " post detected. Official API authorization is not configured, so its media cannot be downloaded."}
+              {!social && imageStatus === "success" && "Download started. On iPhone, Safari may offer the file through Files or the share sheet instead of Photos."}
+              {!social && imageStatus === "error" && (imageError || "The preview could not be loaded. The download may still work if the URL is valid media.")}
+              {!social && imageStatus !== "success" && imageStatus !== "error" && "Images and MP4 files are fetched securely by the server and are not stored."}
             </p>
           </div>
         </div>

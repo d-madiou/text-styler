@@ -10,6 +10,8 @@ export const SUPPORTED_IMAGE_TYPES = new Set([
   "image/webp",
   "image/avif",
 ]);
+export const SUPPORTED_VIDEO_TYPES = new Set(["video/mp4"]);
+export const MAX_VIDEO_BYTES = 10 * 1024 * 1024;
 
 const blockedHostnames = new Set([
   "localhost",

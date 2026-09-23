@@ -47,4 +47,15 @@ describe("image download route", () => {
     expect(result.headers.get("content-disposition")).toContain("attachment");
     expect(new Uint8Array(await result.arrayBuffer())).toEqual(png);
   });
+  it("accepts a signed MP4 response", async () => {
+    const mp4 = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]);
+    const result = await handleImageDownload(request("https://93.184.216.34/video.mp4"), async () => response(200, mp4, { "content-type": "video/mp4" }));
+    expect(result.status).toBe(200);
+    expect(result.headers.get("content-type")).toBe("video/mp4");
+  });
+  it("reports social posts as unavailable without provider credentials", async () => {
+    const result = await handleImageDownload(request("https://www.instagram.com/p/ABC123/"), async () => { throw new Error("must not fetch"); });
+    expect(result.status).toBe(502);
+    expect(await result.json()).toEqual({ error: "Instagram post downloads require official API authorization, which is not configured." });
+  });
 });
