@@ -36,6 +36,16 @@ function ipv4IsPrivate(ip: string) {
 
 function ipv6IsPrivate(ip: string) {
   const normalized = ip.toLowerCase();
+  if (normalized.startsWith("::ffff:")) {
+    const mapped = normalized.slice("::ffff:".length);
+    if (net.isIPv4(mapped)) return ipv4IsPrivate(mapped);
+    const groups = mapped.split(":").map((group) => Number.parseInt(group, 16));
+    if (groups.length === 2 && groups.every(Number.isFinite)) {
+      return ipv4IsPrivate([
+        groups[0] >> 8, groups[0] & 255, groups[1] >> 8, groups[1] & 255,
+      ].join("."));
+    }
+  }
   return (
     normalized === "::" ||
     normalized === "::1" ||
@@ -73,7 +83,7 @@ export async function validateRemoteUrl(
     throw new ImageUrlError("INVALID_URL", "Only public HTTP or HTTPS image URLs are supported.");
   }
 
-  const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
+  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
   if (blockedHostnames.has(hostname) || hostname.endsWith(".localhost") || hostname.endsWith(".internal")) {
     throw new ImageUrlError("BLOCKED_HOST", "This image host is not allowed.");
   }
@@ -96,4 +106,3 @@ export class ImageUrlError extends Error {
     super(message);
   }
 }
-
